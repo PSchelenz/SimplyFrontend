@@ -1,55 +1,69 @@
-import { StyleSheet, Text, View, TextInput, StatusBar, TouchableHighlight, Image, Animated, Dimensions, Switch } from 'react-native';
+import { View, TouchableHighlight, Animated } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { FontAwesome } from '@expo/vector-icons';
-import { useState, useEffect } from 'react';
-import { Audio } from 'expo-av';
-import * as FileSystem from 'expo-file-system';
+import { useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Styles from './styles/Styles';
+import MultiInput from './components/Form/MultiInput';
+import Settings from './components/Settings/Settings';
+import MessagesList from './components/Messages/MessagesList';
+
+questionLifecycle = {
+  starting: 'starting',
+  asked: 'asked',
+  answered: 'answered'
+}
 
 export default function App() {
   const [textQuestion, setTextQuestion] = useState('');
-  const [answer, setAnswer] = useState('');
+  const [assistantConversational, setAssistantConversational] = useState(false);
+  const [shouldRememberContext, setShouldRememberContext] = useState(false);
   const [recording, setRecording] = useState(null);
   const [recordingURI, setRecordingURI] = useState('');
-  const [recordingDuration, setRecordingDuration] = useState(0);
-  const [animatedDots, setAnimatedDots] = useState({
-    dot1: new Animated.Value(0),
-    dot2: new Animated.Value(0),
-    dot3: new Animated.Value(0)
-  });
-  const [assistantConversational, setAssistantConversational] = useState(false);
+  const [answer, setAnswer] = useState('');
   const [optionsHeight, setOptionsHeight] = useState('auto');
   const [optionsSlide, setOptionsSlide] = useState(new Animated.Value(0));
+  const [waitingAnimation, setWaitingAnimation] = useState(new Animated.Value(0));
+  const [questionStatus, setQuestionStatus] = useState(questionLifecycle.starting)
+
 
   let touchStart, touchEnd;
 
-  const updownAnimation = (dot) => {
+  const waitingRotateAnimation = () => {
     Animated.loop(Animated.sequence([
-      Animated.timing(dot, {
-        toValue: 12,
+      Animated.timing(waitingAnimation, {
+        toValue: 0.1667,
         duration: 1000,
         useNativeDriver: false,
       }),
-      Animated.timing(dot, {
-        toValue: 0,
+      Animated.timing(waitingAnimation, {
+        toValue: 0.333,
+        duration: 1000,
+        useNativeDriver: false,
+      }),
+      Animated.timing(waitingAnimation, {
+        toValue: 0.5,
+        duration: 1000,
+        useNativeDriver: false,
+      }),
+      Animated.timing(waitingAnimation, {
+        toValue: 0.667,
+        duration: 1000,
+        useNativeDriver: false,
+      }),
+      Animated.timing(waitingAnimation, {
+        toValue: 0.83333,
+        duration: 1000,
+        useNativeDriver: false,
+      }),
+      Animated.timing(waitingAnimation, {
+        toValue: 1,
         duration: 1000,
         useNativeDriver: false,
       })
-    ]), {iterations: 1000}).start();
-  };
-
-  const runRecordingAnimations = () => {
-    updownAnimation(animatedDots.dot1);
-
-    setTimeout(() => {
-      updownAnimation(animatedDots.dot2);
-    }, 100)
-
-    setTimeout(() => {
-      updownAnimation(animatedDots.dot3);
-    }, 200)
+    ]), { iterations: 1000 }).start();
   }
 
-  const handleSendQuestion = () => {
+  const handleSendQuestion = async () => {
     data = undefined;
     headers = {};
 
@@ -59,6 +73,9 @@ export default function App() {
     if (textQuestion.length > 0) {
       data = JSON.stringify({
         question: textQuestion,
+        assistant_mode: assistantConversational ? 'conversational' : 'informative',
+        should_remember_context: shouldRememberContext ? true : false,
+        api_token: shouldRememberContext ? await AsyncStorage.getItem('apiToken') : null,
       });
 
       headers = {
@@ -67,6 +84,7 @@ export default function App() {
       };
 
     } else if (recordingURI != null) {
+      console.log("Sends recording");
       const filetype = recordingURI.split(".").pop();
       const filename = recordingURI.split("/").pop();
       data = new FormData();
@@ -77,12 +95,21 @@ export default function App() {
         name: filename,
       });
 
+      data.append('assistant_mode', assistantConversational ? 'conversational' : 'informative');
+
+      data.append('should_remember_context', shouldRememberContext ? true : false);
+
+      data.append('api_token', shouldRememberContext ? await AsyncStorage.getItem('apiToken') : null);
+
       headers = {
         'Accept': 'application/json',
       };
     } else {
       return;
     }
+
+    setQuestionStatus(questionLifecycle.asked);
+    waitingRotateAnimation();
 
     fetch("http://192.168.0.10:8000/api/assistant/question", {
       headers: headers,
@@ -94,94 +121,23 @@ export default function App() {
         console.log(res);
 
         setAnswer(res.answer);
+        setTextQuestion('');
+        setQuestionStatus(questionLifecycle.answered)
       })
   }
 
-  const handleTextQuestionInput = (question) => {
-    setTextQuestion(question);
-  }
-
-  async function startRecording() {
-
-    if (recordingURI.length > 0) {
-      FileSystem.deleteAsync(recordingURI, {
-        'idempotent': true
-      });
-    }
-
-    try {
-      console.log('Requesting permissions..');
-      await Audio.requestPermissionsAsync();
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-
-      console.log('Starting recording..');
-      const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-
-      setRecording(recording);
-
-      runRecordingAnimations();
-
-      console.log('Recording started');
-
-    } catch (err) {
-      console.error('Failed to start recording', err);
-    }
-  }
-
-  async function stopRecording() {
-    console.log('Stopping recording..');
-    
-    const {durationMillis} = await recording.stopAndUnloadAsync();
-
-    await Audio.setAudioModeAsync({
-      allowsRecordingIOS: false,
-    });
-
-    const duration = recording.durationMillis;
-
-    const uri = recording.getURI();
-
-    setRecording(undefined);
-    setRecordingURI(uri);
-    setRecordingDuration(durationMillis);
-  }
-
-  const msToTime = (t) => {
-    var ms = t % 1000;
-    t = (t - ms) / 1000;
-    var secs = t % 60;
-    t = (t - secs) / 60;
-    var mins = t % 60;
-
-    return (mins < 10 ? '0' + mins : mins) + ':' + (secs < 10 ? '0' + secs : secs);
-  }
-
-  const handleOptionsLayout = (event) => {
-    if(optionsHeight == 'auto') {
-      const { height } = event.nativeEvent.layout;
-      console.log(event.nativeEvent.layout);
-      setOptionsHeight(height);
-      setOptionsSlide(new Animated.Value(-height))
-    }
-  }
 
   const handleResponderGrant = (event) => {
     touchStart = event.nativeEvent.pageY;
-    console.log(Dimensions.get('window').height, touchStart, touchEnd)
   }
 
   const handleResponderRelease = (event) => {
     touchEnd = event.nativeEvent.pageY;
-    
-    if(touchEnd < touchStart && touchEnd < touchStart - 30) {
+
+    if (touchEnd < touchStart && touchEnd < touchStart - 30) {
       slideUp();
-      console.log('slide up')
-    } else if(touchEnd > touchStart && touchEnd - 30 > touchStart) {
+    } else if (touchEnd > touchStart && touchEnd - 30 > touchStart) {
       slideDown();
-      console.log('slide down')
     }
   }
 
@@ -202,227 +158,30 @@ export default function App() {
   }
 
   return (
-    <View style={styles.container} onStartShouldSetResponder={() => true} onResponderGrant={handleResponderGrant} onResponderRelease={handleResponderRelease}>
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.textInput}
-          id="text_question"
-          name="text_question"
-          placeholder={!recording ? "Zapytaj mnie o coś" : ''}
-          placeholderTextColor={'hsla(0, 0%, 100%, .5)'}
-          onChangeText={handleTextQuestionInput} />
+    <View style={Styles.container} onStartShouldSetResponder={() => true} onResponderGrant={handleResponderGrant} onResponderRelease={handleResponderRelease}>
+      <MultiInput 
+        setTextQuestion={setTextQuestion} 
+        textQuestion={textQuestion} 
+        recording={recording} 
+        setRecording={setRecording} 
+        setRecordingURI={setRecordingURI} 
+        recordingURI={recordingURI} />
 
-        <Text style={styles.recordingTime}>
-          { !recording && recordingURI && msToTime(recordingDuration) }
-        </Text>
+      <MessagesList questionStatus={questionStatus} questionLifecycle={questionLifecycle} waitingAnimation={waitingAnimation} answer={answer}/>
 
-        <View style={styles.audioIconContainer}>
-          {!recording && <TouchableHighlight underlayColor="transparent" style={styles.recordButton} onPress={() => startRecording()}>
-            <FontAwesome name="microphone" size={24} style={styles.audioButton} />
-          </TouchableHighlight>}
-          {recording && <TouchableHighlight underlayColor="transparent" style={styles.recordButton} onPress={() => stopRecording()}>
-            <FontAwesome name="pause" size={24} style={styles.audioButton} />
-          </TouchableHighlight>}
-        </View>
-
-        {recording && 
-          <View style={styles.recordingDots}>
-            <Animated.View style={[styles.recordingDot, {
-              top: animatedDots.dot1,
-              left: 0,
-            }]}/>
-            <Animated.View style={[styles.recordingDot, {
-              top: animatedDots.dot2,
-              left: 10,
-            }]}/>
-            <Animated.View style={[styles.recordingDot, {
-              top: animatedDots.dot3,
-              left: 20
-            }]}/>
-          </View>
-        }
-        
-      </View>
-
-      {answer.length > 0 &&
-        <View style={styles.answerContainer}>
-          <View style={styles.gptLogoContainer}>
-            <Image source={require('./assets/ChatGPT-logo.png')} style={styles.gptLogo} />
-          </View>
-          <Text style={styles.answer}>{answer}</Text>
-        </View>
-      }
-
-      <TouchableHighlight style={styles.sendContainer} onPress={handleSendQuestion}>
-        <Ionicons name="send" style={styles.sendIcon} size={22} />
+      <TouchableHighlight style={Styles.sendContainer} onPress={handleSendQuestion}>
+        <Ionicons name="send" style={Styles.sendIcon} size={22} />
       </TouchableHighlight>
 
-      <Animated.View onLayout={handleOptionsLayout} style={[styles.optionsContainer, {
-        height: optionsHeight,
-        bottom: optionsSlide,
-      }]}>
-        <View style={styles.optionsTopHandler}>
-
-        </View>
-        <View style={styles.switchOption}>
-          <View>
-            <Text style={styles.optionMainText}>Tryb asystenta</Text>
-            <Text style={styles.optionSubText}>(ON - konwersacyjny | OFF - informacyjny)</Text>
-          </View>
-          
-          <Switch
-            trackColor={{false: '#767577', true: '#81b0ff'}}
-            thumbColor={assistantConversational ? '#f5dd4b' : '#f4f3f4'}
-            ios_backgroundColor="#3e3e3e"
-            onValueChange={(event) => setAssistantConversational(prevState => !prevState)}
-            value={assistantConversational}
-          />
-        </View>
-      </Animated.View>
+      <Settings
+        setAssistantConversational={setAssistantConversational}
+        assistantConversational={assistantConversational}
+        setShouldRememberContext={setShouldRememberContext}
+        shouldRememberContext={shouldRememberContext}
+        setOptionsSlide={setOptionsSlide}
+        optionsSlide={optionsSlide}
+        setOptionsHeight={setOptionsHeight}
+        optionsHeight={optionsHeight} />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    position: 'relative',
-    flex: 1,
-    backgroundColor: 'rgb(52, 53, 65)',
-    alignItems: 'center',
-    paddingTop: StatusBar.currentHeight + 40,
-    paddingHorizontal: 20,
-  },
-
-  inputContainer: {
-    position: 'relative',
-    backgroundColor: 'rgb(64, 65, 79)',
-    width: '100%',
-    display: 'flex',
-    alignItems: 'center',
-    flexDirection: 'row',
-  },
-
-  textInput: {
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    color: '#FFF',
-    flex: 1,
-  },
-
-  audioIconContainer: {
-    width: 40,
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  audioButton: {
-    color: 'hsla(0, 0%, 100%, .5)',
-  },
-
-  sendContainer: {
-    flex: 1,
-    position: 'absolute',
-    bottom: 30,
-    right: 30,
-    width: 50,
-    height: 50,
-    borderRadius: 50 / 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgb(64, 65, 79)',
-  },
-
-  sendIcon: {
-    transform: [{ rotate: '-40deg' }],
-    color: '#DDD',
-    marginLeft: 4,
-    marginBottom: 2,
-  },
-
-  answerContainer: {
-    padding: 12,
-    marginTop: 16,
-    backgroundColor: 'rgb(64, 65, 79)',
-    borderRadius: 10,
-    width: '100%',
-  },
-
-  answer: {
-    marginTop: 16,
-    color: 'rgb(209, 213, 219)',
-  },
-
-  gptLogoContainer: {
-    alignItems: 'center',
-  },
-
-  gptLogo: {
-    width: 52,
-    height: 52,
-  },
-
-  margin: {
-    marginTop: 12,
-  },
-
-  recordingDots: {
-    position: 'absolute',
-    left: '50%',
-    top: '50%',
-    transform: [{translateY: -10}, {translateX: -10}]
-  },
-
-  recordingDot: {
-    width: 4,
-    height: 4,
-    backgroundColor: 'hsla(0, 0%, 100%, .5)',
-    borderRadius: 2,
-    position: 'absolute',
-    top: '50%',
-  },
-
-  recordingTime: {
-    color: 'hsla(0, 0%, 100%, .5)',
-  },
-
-  optionsContainer: {
-    backgroundColor: 'rgb(247,247,248)',
-    position: 'absolute',
-    width: Dimensions.get('window').width,
-    bottom: 0,
-    left: 0,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-  },
-
-  optionsTopHandler: {
-    position: 'absolute',
-    left: '50%',
-    top: -10,
-    height: 6,
-    width: 76,
-    backgroundColor: 'rgb(247,247,248)',
-    transform: [{translateX: -38}],
-    borderRadius: 3,
-  },
-
-  switchOption: {
-    display: 'flex',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 12,
-  },
-
-  optionMainText: {
-    fontSize: 14,
-    fontWeight: 600,
-  },
-
-  optionSubText: {
-    fontSize: 12,
-    fontWeight: 400
-  }
-});
