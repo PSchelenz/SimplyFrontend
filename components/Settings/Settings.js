@@ -34,7 +34,7 @@ const Settings = (props) => {
 
   const handleAuthorizationSubmit = () => {
     if (authorizationSecret) {
-      fetch("http://192.168.0.10:8000/api/authorization", {
+      fetch("http://34.118.71.183/api/authorization", {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',

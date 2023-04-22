@@ -6,7 +6,7 @@ export default StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgb(52, 53, 65)',
     alignItems: 'center',
-    paddingTop: StatusBar.currentHeight + 40,
+    paddingTop: StatusBar.currentHeight + 20,
     paddingHorizontal: 20,
   },
 

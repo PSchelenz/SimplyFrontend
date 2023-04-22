@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Simply",
-    "slug": "Simply",
+    "slug": "simply",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -21,10 +21,29 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.pschelenz.simply"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "076683cd-3df1-4a85-9ebe-bba22cb84bd9"
+      }
+    },
+    "owner": "pschelenz",
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 31,
+            "targetSdkVersion": 31,
+            "buildToolsVersion": "31.0.0"
+          }
+        }
+      ]
+    ]
   }
 }

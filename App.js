@@ -111,7 +111,7 @@ export default function App() {
     setQuestionStatus(questionLifecycle.asked);
     waitingRotateAnimation();
 
-    fetch("http://192.168.0.10:8000/api/assistant/question", {
+    fetch("http://34.118.71.183/api/assistant/question", {
       headers: headers,
       method: 'POST',
       body: data
