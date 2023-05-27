@@ -1,11 +1,12 @@
 import { View, TouchableHighlight, Animated } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Styles from './styles/Styles';
 import MultiInput from './components/Form/MultiInput';
 import Settings from './components/Settings/Settings';
 import MessagesList from './components/Messages/MessagesList';
+import { StatusBar } from 'react-native';
 
 questionLifecycle = {
   starting: 'starting',
@@ -24,9 +25,22 @@ export default function App() {
   const [optionsSlide, setOptionsSlide] = useState(new Animated.Value(0));
   const [waitingAnimation, setWaitingAnimation] = useState(new Animated.Value(0));
   const [questionStatus, setQuestionStatus] = useState(questionLifecycle.starting)
-
+  const [serverIp, setServerIp] = useState(null);
 
   let touchStart, touchEnd;
+
+  useEffect(() => {
+    async function setCurrentServerIp() {
+      const currentServerIp = await AsyncStorage.getItem('serverIp') ?? null;
+      setServerIp(currentServerIp);
+    }
+    
+    setCurrentServerIp();
+  }, []);
+
+  useEffect(() => {
+    AsyncStorage.setItem('serverIp', serverIp);
+  }, [serverIp])
 
   const waitingRotateAnimation = () => {
     Animated.loop(Animated.sequence([
@@ -64,6 +78,10 @@ export default function App() {
   }
 
   const handleSendQuestion = async () => {
+    if(!serverIp) {
+      return;
+    }
+
     data = undefined;
     headers = {};
 
@@ -111,7 +129,7 @@ export default function App() {
     setQuestionStatus(questionLifecycle.asked);
     waitingRotateAnimation();
 
-    fetch("http://34.118.71.183/api/assistant/question", {
+    fetch(`http://${serverIp}/api/assistant/question`, {
       headers: headers,
       method: 'POST',
       body: data
@@ -159,6 +177,7 @@ export default function App() {
 
   return (
     <View style={Styles.container} onStartShouldSetResponder={() => true} onResponderGrant={handleResponderGrant} onResponderRelease={handleResponderRelease}>
+      <StatusBar backgroundColor={'transparent'} translucent />
       <MultiInput 
         setTextQuestion={setTextQuestion} 
         textQuestion={textQuestion} 
@@ -181,7 +200,9 @@ export default function App() {
         setOptionsSlide={setOptionsSlide}
         optionsSlide={optionsSlide}
         setOptionsHeight={setOptionsHeight}
-        optionsHeight={optionsHeight} />
+        optionsHeight={optionsHeight}
+        setServerIp={setServerIp}
+        serverIp={serverIp}/>
     </View>
   );
 }

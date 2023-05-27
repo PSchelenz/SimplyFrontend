@@ -4,6 +4,7 @@ import Styles from '../../styles/Styles';
 import { useState } from 'react';
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
+import * as ImagePicker from 'expo-image-picker';
 
 const MultiInput = (props) => {
 	const [animatedDots, setAnimatedDots] = useState({
@@ -12,6 +13,7 @@ const MultiInput = (props) => {
 		dot3: new Animated.Value(0)
 	});
 	const [recordingDuration, setRecordingDuration] = useState(0);
+	const [waitingForOCR, setWaitingForOCR] = useState(false);
 
 	const handleTextQuestionInput = (question) => {
 		props.setTextQuestion(question);
@@ -26,21 +28,21 @@ const MultiInput = (props) => {
 		}
 
 		try {
-			console.log('Requesting permissions..');
+			// console.log('Requesting permissions..');
 			await Audio.requestPermissionsAsync();
 			await Audio.setAudioModeAsync({
 				allowsRecordingIOS: true,
 				playsInSilentModeIOS: true,
 			});
 
-			console.log('Starting recording..');
+			// console.log('Starting recording..');
 			const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
 
 			props.setRecording(recording);
 
 			runRecordingAnimations();
 
-			console.log('Recording started');
+			// console.log('Recording started');
 
 		} catch (err) {
 			console.error('Failed to start recording', err);
@@ -48,7 +50,7 @@ const MultiInput = (props) => {
 	}
 
 	async function stopRecording() {
-		console.log('Stopping recording..');
+		// console.log('Stopping recording..');
 
 		const { durationMillis } = await props.recording.stopAndUnloadAsync();
 
@@ -100,14 +102,68 @@ const MultiInput = (props) => {
 		]), { iterations: 1000 }).start();
 	};
 
+	const useCamera = async () => {
+		try {
+			// console.log('Requesting camera permissions...');
+			
+			await ImagePicker.requestCameraPermissionsAsync();
+
+			let result = await ImagePicker.launchCameraAsync({
+				allowsEditing: true,
+				quality: 0.8,
+			});
+
+			imageURI = result['assets'][0]['uri'];
+
+			// console.log("Sends image to OCR processing");
+			const filetype = imageURI.split(".").pop();
+			const filename = imageURI.split("/").pop();
+			data = new FormData();
+		
+			data.append('file', {
+				uri: imageURI,
+				type: `image/${filetype}`,
+				name: filename
+			});
+		
+			data.append('OCREngine', '2');
+
+			data.append('detectOrientation', true);
+		
+			headers = {
+				'apikey': 'K88352441788957',
+				'Accept': 'application/json',
+			}
+
+			setWaitingForOCR(true);
+			runRecordingAnimations();
+
+			fetch(`https://api.ocr.space/parse/image`, {
+				headers: headers,
+				method: 'POST',
+				body: data
+			})
+				.then(res => res.json())
+				.then(res => {
+					question = res["ParsedResults"][0]["ParsedText"];
+					setWaitingForOCR(false);
+					props.setTextQuestion(question);
+				})
+		  
+		} catch (error) {
+			console.error('Failed to start camera/load image', error);
+		}
+	}
+
 	return (
 		<View style={Styles.inputContainer}>
 			<TextInput
+				multiline={true}
 				style={Styles.textInput}
 				id="text_question"
 				name="text_question"
 				value={props.textQuestion}
-				placeholder={!props.recording ? "Zapytaj mnie o coś" : ''}
+				placeholder={!(props.recording || waitingForOCR) ? "Zapytaj mnie o coś" : ''}
 				placeholderTextColor={'hsla(0, 0%, 100%, .5)'}
 				onChangeText={handleTextQuestionInput} />
 
@@ -122,9 +178,12 @@ const MultiInput = (props) => {
 				{props.recording && <TouchableHighlight underlayColor="transparent" style={Styles.recordButton} onPress={() => stopRecording()}>
 					<FontAwesome name="pause" size={24} style={Styles.audioButton} />
 				</TouchableHighlight>}
+				<TouchableHighlight underlayColor="transparent" style={Styles.recordButton} onPress={() => useCamera()}>
+					<FontAwesome name="camera" size={24} style={Styles.audioButton} />
+				</TouchableHighlight>
 			</View>
 
-			{props.recording &&
+			{(props.recording || waitingForOCR) &&
 				<View style={Styles.recordingDots}>
 					<Animated.View style={[Styles.recordingDot, {
 						top: animatedDots.dot1,

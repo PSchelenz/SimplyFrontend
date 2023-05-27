@@ -8,6 +8,7 @@ const Settings = (props) => {
   const [showAuthorizationModal, setShowAuthorizationModal] = useState(false);
   const [authorizationSecret, setAuthorizationSecret] = useState('');
   const [authorizationError, setAuthorizationError] = useState('');
+  const [canFillServerIpInput, setCanFillServerIpInput] = useState(false);
 
   const handleOptionsLayout = (event) => {
     if (props.optionsHeight == 'auto') {
@@ -34,7 +35,7 @@ const Settings = (props) => {
 
   const handleAuthorizationSubmit = () => {
     if (authorizationSecret) {
-      fetch("http://34.118.71.183/api/authorization", {
+      fetch(`http://${props.serverIp}/api/authorization`, {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
@@ -62,7 +63,15 @@ const Settings = (props) => {
 
   const handleAuthorizationModalClose = () => {
     setShowAuthorizationModal(false);
-    setShouldRememberContext(false);
+    props.setShouldRememberContext(false);
+  }
+
+  const handleAllowServerIpFill = () => {
+    setCanFillServerIpInput(prevState => !prevState);
+  }
+
+  const handleServerIpChange = (value) => {
+    props.setServerIp(value);
   }
 
   return (
@@ -97,6 +106,33 @@ const Settings = (props) => {
             ios_backgroundColor="#3e3e3e"
             onValueChange={handleRememberContextSwitch}
             value={props.shouldRememberContext}
+          />
+        </View>
+        <View style={Styles.switchOption}>
+          {canFillServerIpInput ? 
+            <TextInput
+              style={Styles.settingsInput}
+              id="server_ip"
+              name="server_ip"
+              value={props.serverIp}
+              placeholder={'IP serwera'}
+              placeholderTextColor={'hsla(0, 0%, 100%, .5)'}
+              onChangeText={handleServerIpChange} 
+              editable={canFillServerIpInput} /> 
+            : 
+            <View>
+              <Text style={Styles.optionMainText}>IP serwera</Text>
+              <Text style={Styles.optionSubText}>{props.serverIp ?? "Nieznane"}</Text>
+            </View>
+          }
+          
+          
+          <Switch
+            trackColor={{ false: '#767577', true: '#202123' }}
+            thumbColor={canFillServerIpInput ? '#fae69e' : '#f4f3f4'}
+            ios_backgroundColor="#3e3e3e"
+            onValueChange={handleAllowServerIpFill}
+            value={canFillServerIpInput}
           />
         </View>
       </Animated.View>

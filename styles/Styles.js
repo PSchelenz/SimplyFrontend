@@ -6,7 +6,7 @@ export default StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgb(52, 53, 65)',
     alignItems: 'center',
-    paddingTop: StatusBar.currentHeight + 20,
+    paddingTop: StatusBar.currentHeight + 40,
     paddingHorizontal: 20,
   },
 
@@ -15,7 +15,7 @@ export default StyleSheet.create({
     backgroundColor: 'rgb(64, 65, 79)',
     width: '100%',
     display: 'flex',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     flexDirection: 'row',
   },
 
@@ -28,10 +28,14 @@ export default StyleSheet.create({
   },
 
   audioIconContainer: {
-    width: 40,
+    width: 60,
+    paddingTop: 12,
+    marginRight: 10,
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
+    flexDirection: 'row',
+    gap: 12,
   },
 
   audioButton: {
@@ -101,6 +105,8 @@ export default StyleSheet.create({
 
   recordingTime: {
     color: 'hsla(0, 0%, 100%, .5)',
+    paddingTop: 14,
+    marginRight: 4,
   },
 
   optionsContainer: {
@@ -209,5 +215,15 @@ export default StyleSheet.create({
     marginLeft: 6,
     color: '#DC3545',
     fontSize: 12
+  },
+
+  settingsInput: {
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    color: '#000',
+    flex: 1,
+    backgroundColor: 'lightgray',
+    maxWidth: 200
   }
 });
